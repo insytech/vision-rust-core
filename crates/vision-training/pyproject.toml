@@ -21,5 +21,4 @@ dependencies = ["numpy>=1.24,<2.0"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
-python-source = "python"
 module-name = "vision_training"
