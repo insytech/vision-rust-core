@@ -1,0 +1,24 @@
+{
+  "name": "vision-ai-node",
+  "version": "0.1.0",
+  "description": "Rust optimizations for vision-ai Node.js server",
+  "main": "index.node",
+  "types": "index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/insytech/vision-rust-core"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@neon-rs/cli": "^0.1.0"
+  },
+  "scripts": {
+    "build": "cargo build --release && neon build --release",
+    "build:debug": "cargo build && neon build",
+    "test": "cargo test"
+  },
+  "files": [
+    "index.node",
+    "index.d.ts"
+  ]
+}

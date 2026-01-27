@@ -1,0 +1,90 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/vision-storage",
+    "crates/vision-training",
+    "crates/vision-ai-node",
+    "crates/shared",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Insytech Vision Team"]
+license = "MIT"
+repository = "https://github.com/insytech/vision-rust-core"
+
+[workspace.dependencies]
+# PyO3 for Python bindings
+pyo3 = { version = "0.22", features = ["extension-module"] }
+numpy = "0.22"
+
+# Core
+ndarray = "0.16"
+rayon = "1.10"
+thiserror = "2.0"
+
+# Async runtime
+tokio = { version = "1.43", features = ["full"] }
+reqwest = { version = "0.12", features = ["stream", "rustls-tls"], default-features = false }
+futures = "0.3"
+
+# Image processing
+image = { version = "0.25", features = ["jpeg", "png"] }
+imageproc = "0.25"
+
+# Compression
+zip = { version = "2.2", features = ["deflate-flate2"] }
+flate2 = "1.0"
+
+# JSON parsing
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+simd-json = "0.14"
+
+# File system
+walkdir = "2.5"
+ignore = "0.4"
+
+# Base64 encoding
+base64 = "0.22"
+
+# Shared crate
+shared = { path = "crates/shared" }
+
+# Benchmarking
+criterion = { version = "0.5", features = ["html_reports"] }
+rand = "0.8"
+
+# Testing
+tempfile = "3.20"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[profile.release-fast]
+inherits = "release"
+lto = "thin"
+codegen-units = 4
+
+# Root package for benchmarks
+[package]
+name = "vision-rust-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+shared = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+rand = { workspace = true }
+ndarray = { workspace = true }
+
+[[bench]]
+name = "efficientad_bench"
+harness = false

@@ -1,0 +1,31 @@
+[package]
+name = "vision-ai-node"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Rust optimizations for vision-ai Node.js server (Neon)"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+shared = { workspace = true }
+
+ndarray = { workspace = true }
+rayon = { workspace = true }
+thiserror = { workspace = true }
+
+flate2 = { workspace = true }
+zip = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+simd-json = { workspace = true }
+
+walkdir = { workspace = true }
+
+# Neon for Node.js bindings
+neon = { version = "1.0", features = ["napi-6"] }
+
+[features]
+default = []
