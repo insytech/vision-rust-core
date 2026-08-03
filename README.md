@@ -63,11 +63,21 @@ LD_LIBRARY_PATH=/root/miniconda3/lib cargo test --workspace
 
 ### Build the Python module
 
+The crate builds against CPython's stable ABI (`pyo3/abi3-py310`), so the
+result is a **single** wheel -- `vision_training-<ver>-cp310-abi3-<plat>.whl` --
+that installs on 3.10 (the training server) through 3.13 (dev boxes). Build it
+with the *oldest* supported interpreter; a newer one still produces a
+`cp310-abi3` tag but pins a newer glibc into the platform tag.
+
 ```bash
 cd crates/vision-training
-maturin build --release
+maturin build --release --interpreter /root/miniconda3/envs/vision-training-v2/bin/python
 pip install ../../target/wheels/vision_training-*.whl
 ```
+
+Keep exactly one `vision_training-*.whl` in whatever directory you install
+from: `Dockerfile.gpu` installs by glob, and a leftover per-interpreter wheel
+next to the abi3 one makes which `.so` wins depend on shell glob order.
 
 ## Usage
 

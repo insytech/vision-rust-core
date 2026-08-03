@@ -15,7 +15,19 @@ name = "vision_training"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = { workspace = true }
+# `abi3-py310` builds against CPython's *stable* ABI, so ONE wheel
+# (`...-cp310-abi3-...whl`) imports on 3.10 (the training server) and on 3.13
+# (dev boxes) alike, instead of one wheel per interpreter -- installing the
+# wrong one used to give `ModuleNotFoundError` next to a wheel that visibly
+# "was there".
+#
+# It does NOT change the module's contract, only how the `.so` links, so the
+# crate version (== `file_service.REQUIRED_RUST_ABI`) deliberately stays 0.2.0.
+#
+# Declared here and not in `[workspace.dependencies]` on purpose: the workspace
+# entry documents why `extension-module` must stay off (it breaks `cargo test`),
+# and abi3 is this crate's concern alone -- `shared` has no pyo3 dependency.
+pyo3 = { workspace = true, features = ["abi3-py310"] }
 numpy = { workspace = true }
 shared = { workspace = true }
 
