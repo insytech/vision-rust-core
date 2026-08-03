@@ -1,6 +1,11 @@
 [package]
 name = "vision-training"
-version.workspace = true
+# Deliberately NOT `version.workspace = true`. This crate's version is the ABI
+# contract the training server pins against (`vision_training.__version__`).
+# 0.2.0 is the LabelMe converter's encoding parameter: both `convert_labelme_*`
+# pyfunctions changed arity and return type, so a 0.1.x `.so` must be refused
+# rather than called. Bump it whenever a pyfunction signature changes.
+version = "0.2.0"
 edition.workspace = true
 authors.workspace = true
 description = "Rust optimizations for training-server (PyO3)"

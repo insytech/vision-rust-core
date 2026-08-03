@@ -16,7 +16,12 @@ repository = "https://github.com/insytech/vision-rust-core"
 
 [workspace.dependencies]
 # PyO3 for Python bindings
-pyo3 = { version = "0.22", features = ["extension-module"] }
+# NOTE: `extension-module` is deliberately NOT enabled here. It tells pyo3 not to
+# link libpython, which is correct for the built wheel and fatal for `cargo test`
+# (every test binary fails to link with `undefined symbol: PyErr_SetString`).
+# Each crate's pyproject.toml already passes `features = ["pyo3/extension-module"]`
+# to maturin, so the wheel is unaffected and the crate tests become runnable.
+pyo3 = { version = "0.22" }
 numpy = "0.22"
 
 # Core

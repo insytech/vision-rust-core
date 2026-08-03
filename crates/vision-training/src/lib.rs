@@ -16,6 +16,12 @@ pub mod walker;
 /// Python module for vision-training
 #[pymodule]
 fn vision_training(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // The ABI contract. `file_service` pins this and refuses to call into a
+    // module that does not match, because a stale `.so` imports perfectly well
+    // and only fails at *call* time -- far too late for the `try/except
+    // ImportError` guard around the import to catch it.
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+
     // EfficientAD functions
     m.add_function(wrap_pyfunction!(efficientad::compute_anomaly_maps, m)?)?;
     m.add_function(wrap_pyfunction!(efficientad::find_bounding_boxes, m)?)?;

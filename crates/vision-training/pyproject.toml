@@ -4,7 +4,10 @@ build-backend = "maturin"
 
 [project]
 name = "vision-training"
-version = "0.1.0"
+# Must track crates/vision-training/Cargo.toml -- the training server pins
+# `vision_training.__version__` (which comes from the Cargo version) as an ABI
+# check, and a wheel whose filename disagrees with its `__version__` is a trap.
+version = "0.2.0"
 description = "Rust optimizations for training-server"
 readme = "README.md"
 requires-python = ">=3.10"
