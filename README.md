@@ -7,7 +7,6 @@ Rust extensions for the Vision AI platform.
 | Crate | Target | Bindings | Status |
 |-------|--------|----------|--------|
 | `vision-training` | training-server | PyO3 | **Deployed.** Wheel built and installed; ABI pinned |
-| `vision-ai-node` | vision-ai | Neon | Built, **not wired**: no `package.json` declares it |
 | `shared` | Internal | - | Common utilities |
 
 `vision-storage` was removed on 2026-08-03. No `Dockerfile`, `requirements.txt`
@@ -16,10 +15,19 @@ or deploy script ever installed its wheel, so every call site in
 one measurable win — `generate_thumbnail` — is now covered by `PIL.draft()` in
 `storage-server/src/api/utils/thumbnail.py`.
 
-`json_simd.rs` was removed from `vision-ai-node` at the same time: benchmarked
-at **0.27x** for parse and **0.14x** for stringify, i.e. V8's native
-`JSON.parse` / `JSON.stringify` are 4x and 7x faster. The exported TypeScript
-`jsonParse` / `jsonStringify` helpers in `vision-ai` already call native JS.
+`vision-ai-node` was removed on 2026-08-03, the whole crate this time. Its
+`json_simd.rs` had already gone: benchmarked at **0.27x** for parse and
+**0.14x** for stringify, i.e. V8's native `JSON.parse` / `JSON.stringify` are
+4x and 7x faster. What remained — `zipper.rs` and `transformer.rs` — was never
+loaded by any deployment: no `package.json` or `pnpm-lock.yaml` declared the
+module, and `vision-ai/server/.dockerignore` excludes `node_modules`, so the
+`require` inside `rust-optimized.ts` always threw and the `archiver` fallback
+always ran. The ZIP path did measure **2.69x** faster than `archiver`
+(120 x 60 KB files, level 9: 66.2 ms vs 178.2 ms), but realising it would mean
+shipping a prebuilt `.node` per architecture into a `node:21-alpine` image that
+has no Rust toolchain — for a single manual installer download. The
+`rust-optimized.ts` wrapper and its tests went with it; the endpoint now calls
+`archiver` directly, with no branch.
 
 ## Why `vision-training` is kept
 
@@ -61,14 +69,6 @@ maturin build --release
 pip install ../../target/wheels/vision_training-*.whl
 ```
 
-### Build the Node.js module
-
-```bash
-cd crates/vision-ai-node
-npm install
-npm run build
-```
-
 ## Usage
 
 ### vision-training (Python)
@@ -100,19 +100,6 @@ benchmarked **slower** than the OpenCV/NumPy equivalents (0.04x, 0.1x, 0.2x).
 They remain exported because the shipped wheel's ABI is pinned; do not reach
 for them in new code.
 
-### vision-ai-node (Node.js)
-
-```typescript
-import { createZip, transformRevision } from 'vision-ai-node';
-
-const fileCount = createZip('/source/dir', '/output.zip', 6);
-const transformed = transformRevision(revisionData);
-```
-
-`vision-ai/server/src/tools/rust-optimized.ts` `require`s this module inside a
-`try` and falls back to `archiver` / plain JS when it is absent — which is the
-case in every current deployment, since nothing declares it as a dependency.
-
 ## Architecture
 
 ```
@@ -122,21 +109,15 @@ vision-rust-core/
 │   ├── shared/                # Common utilities
 │   │   └── src/{lib,error,image_ops,io_utils}.rs
 │   │
-│   ├── vision-training/       # training-server (PyO3)
-│   │   ├── src/
-│   │   │   ├── lib.rs
-│   │   │   ├── efficientad/
-│   │   │   ├── downloader.rs
-│   │   │   ├── labelme_yolo.rs
-│   │   │   └── walker.rs
-│   │   ├── Cargo.toml
-│   │   └── pyproject.toml
-│   │
-│   └── vision-ai-node/        # vision-ai (Neon)
-│       ├── src/{lib,zipper,transformer}.rs
+│   └── vision-training/       # training-server (PyO3)
+│       ├── src/
+│       │   ├── lib.rs
+│       │   ├── efficientad/
+│       │   ├── downloader.rs
+│       │   ├── labelme_yolo.rs
+│       │   └── walker.rs
 │       ├── Cargo.toml
-│       ├── package.json
-│       └── index.d.ts
+│       └── pyproject.toml
 │
 └── README.md
 ```
@@ -157,17 +138,6 @@ cargo bench
 Add to `requirements.txt`:
 ```
 vision-training @ file:///path/to/vision-rust-core/target/wheels/vision_training-*.whl
-```
-
-### vision-ai
-
-Add to `package.json` (currently **not** done — the module is unused):
-```json
-{
-  "dependencies": {
-    "vision-ai-node": "file:../vision-rust-core/crates/vision-ai-node"
-  }
-}
 ```
 
 ## License

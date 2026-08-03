@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "crates/vision-training",
-    "crates/vision-ai-node",
     "crates/shared",
 ]
 
