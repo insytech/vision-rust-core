@@ -1,69 +1,67 @@
 # Vision Rust Core
 
-High-performance Rust extensions for Vision AI servers.
+Rust extensions for the Vision AI platform.
 
 ## Overview
 
-This workspace contains Rust modules that replace CPU-bound and I/O-intensive operations in the Vision AI platform:
-
-| Crate | Target | Bindings | Description |
-|-------|--------|----------|-------------|
-| `vision-storage` | storage-server | PyO3 | Thumbnails, encoding, COCO parsing, ZIP |
-| `vision-training` | training-server | PyO3 | EfficientAD pipeline, downloads, conversions |
-| `vision-ai-node` | vision-ai | Neon | SIMD JSON, ZIP, transformations |
+| Crate | Target | Bindings | Status |
+|-------|--------|----------|--------|
+| `vision-training` | training-server | PyO3 | **Deployed.** Wheel built and installed; ABI pinned |
+| `vision-ai-node` | vision-ai | Neon | Built, **not wired**: no `package.json` declares it |
 | `shared` | Internal | - | Common utilities |
 
-## Performance Gains
+`vision-storage` was removed on 2026-08-03. No `Dockerfile`, `requirements.txt`
+or deploy script ever installed its wheel, so every call site in
+`storage-server` and `training-server` always took the Python fallback, and its
+one measurable win — `generate_thumbnail` — is now covered by `PIL.draft()` in
+`storage-server/src/api/utils/thumbnail.py`.
 
-| Operation | Python/JS | Rust | Speedup |
-|-----------|-----------|------|---------|
-| Encoding detection (chardet) | ~200ms | ~2ms | **100x** |
-| Thumbnail generation | ~200ms | ~20ms | **10x** |
-| COCO JSON parsing (10k) | ~3s | ~150ms | **20x** |
-| ZIP compression | ~4s | ~700ms | **6x** |
-| JSON.parse (MQTT) | ~5ms | ~1ms | **5x** |
-| EfficientAD inference | ~500ms | ~50ms | **10x** |
+`json_simd.rs` was removed from `vision-ai-node` at the same time: benchmarked
+at **0.27x** for parse and **0.14x** for stringify, i.e. V8's native
+`JSON.parse` / `JSON.stringify` are 4x and 7x faster. The exported TypeScript
+`jsonParse` / `jsonStringify` helpers in `vision-ai` already call native JS.
+
+## Why `vision-training` is kept
+
+Not for speed — its conversion is only ~1.2x faster than the Python path. It is
+kept for **capability**: it is the only converter that emits `obb9` (the nine
+DOTA values for oriented boxes). The `labelme2yolo` CLI can only emit `bbox5`.
+
+Its Python module version (`vision_training.__version__`) is an ABI contract
+that `training-server` checks at import time; bumping the crate version without
+rebuilding and reinstalling the wheel disables the Rust path with a logged
+mismatch instead of failing silently. See
+`vision-device/docs/deploy-gates-model-type-pipeline.md`.
 
 ## Quick Start
 
 ### Prerequisites
 
 ```bash
-# Install Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source ~/.cargo/env
-
-# Install maturin (for Python bindings)
 pip install maturin
 ```
 
-### Build All Crates
+### Build and test
 
 ```bash
 cd vision-rust-core
-
-# Build workspace
 cargo build --release
 
-# Run tests
-cargo test
+# `cargo test` links against libpython, so it needs the interpreter's libdir.
+LD_LIBRARY_PATH=/root/miniconda3/lib cargo test --workspace
 ```
 
-### Build Python Modules
+### Build the Python module
 
 ```bash
-# vision-storage
-cd crates/vision-storage
+cd crates/vision-training
 maturin build --release
-pip install target/wheels/*.whl
-
-# vision-training
-cd ../vision-training
-maturin build --release
-pip install target/wheels/*.whl
+pip install ../../target/wheels/vision_training-*.whl
 ```
 
-### Build Node.js Module
+### Build the Node.js module
 
 ```bash
 cd crates/vision-ai-node
@@ -71,26 +69,7 @@ npm install
 npm run build
 ```
 
-## Usage Examples
-
-### vision-storage (Python)
-
-```python
-import vision_storage as vs
-
-# Fast thumbnail generation
-thumbnail_bytes = vs.generate_thumbnail(image_bytes, max_size=200, quality=85)
-
-# Fast encoding detection (replaces chardet)
-content, encoding = vs.verify_encoding("/path/to/file.json")
-
-# COCO to LabelMe conversion
-labelme_annotations = vs.parse_coco_to_labelme(coco_json_string)
-
-# ZIP operations
-vs.extract_zip("/path/to/file.zip", "/dest/dir")
-vs.compress_directory("/source/dir", "/output.zip", compression_level=6)
-```
+## Usage
 
 ### vision-training (Python)
 
@@ -104,48 +83,35 @@ st_map, ae_map, combined, max_score = vt.compute_anomaly_maps(
     st_weight=0.5, ae_weight=0.5
 )
 
-# Find anomaly regions
-boxes = vt.find_bounding_boxes(binary_mask, min_area=50)
-
-# Generate overlay
-overlay = vt.generate_overlay(image, heatmap, alpha=0.5)
-
-# Fast parallel downloads
-results = vt.download_files([
-    ("http://example.com/file1.jpg", "/dest/file1.jpg"),
-    ("http://example.com/file2.jpg", "/dest/file2.jpg"),
-], max_concurrent=50)
-
-# LabelMe to YOLO conversion
+# LabelMe to YOLO conversion (the reason this crate exists: obb9)
 vt.convert_labelme_dir_to_yolo(
     "/input/labelme",
     "/output/yolo",
     ["class1", "class2", "class3"]
 )
 
-# Fast directory walking
+# Parallel downloads, directory walking
+results = vt.download_files([("http://example.com/a.jpg", "/dest/a.jpg")], max_concurrent=50)
 images = vt.find_images("/data/images", max_depth=3)
 ```
+
+Some exports (`find_bounding_boxes`, `generate_overlay`, `generate_mask`) were
+benchmarked **slower** than the OpenCV/NumPy equivalents (0.04x, 0.1x, 0.2x).
+They remain exported because the shipped wheel's ABI is pinned; do not reach
+for them in new code.
 
 ### vision-ai-node (Node.js)
 
 ```typescript
-import {
-  jsonParse,
-  jsonStringify,
-  createZip,
-  transformRevision
-} from 'vision-ai-node';
+import { createZip, transformRevision } from 'vision-ai-node';
 
-// SIMD JSON parsing (for MQTT messages)
-const metrics = jsonParse(mqttPayload);
-
-// Fast ZIP creation
 const fileCount = createZip('/source/dir', '/output.zip', 6);
-
-// Batch transformation
 const transformed = transformRevision(revisionData);
 ```
+
+`vision-ai/server/src/tools/rust-optimized.ts` `require`s this module inside a
+`try` and falls back to `archiver` / plain JS when it is absent — which is the
+case in every current deployment, since nothing declares it as a dependency.
 
 ## Architecture
 
@@ -154,22 +120,7 @@ vision-rust-core/
 ├── Cargo.toml                 # Workspace configuration
 ├── crates/
 │   ├── shared/                # Common utilities
-│   │   ├── src/
-│   │   │   ├── lib.rs
-│   │   │   ├── error.rs       # Error types
-│   │   │   ├── image_ops.rs   # Image operations
-│   │   │   └── io_utils.rs    # I/O utilities
-│   │   └── Cargo.toml
-│   │
-│   ├── vision-storage/        # storage-server (PyO3)
-│   │   ├── src/
-│   │   │   ├── lib.rs
-│   │   │   ├── thumbnail.rs
-│   │   │   ├── encoding.rs
-│   │   │   ├── coco_parser.rs
-│   │   │   └── zip_ops.rs
-│   │   ├── Cargo.toml
-│   │   └── pyproject.toml
+│   │   └── src/{lib,error,image_ops,io_utils}.rs
 │   │
 │   ├── vision-training/       # training-server (PyO3)
 │   │   ├── src/
@@ -182,11 +133,7 @@ vision-rust-core/
 │   │   └── pyproject.toml
 │   │
 │   └── vision-ai-node/        # vision-ai (Neon)
-│       ├── src/
-│       │   ├── lib.rs
-│       │   ├── json_simd.rs
-│       │   ├── zipper.rs
-│       │   └── transformer.rs
+│       ├── src/{lib,zipper,transformer}.rs
 │       ├── Cargo.toml
 │       ├── package.json
 │       └── index.d.ts
@@ -196,63 +143,25 @@ vision-rust-core/
 
 ## Development
 
-### Running Tests
-
 ```bash
-# All tests
-cargo test
-
-# Specific crate
-cargo test -p vision-storage
-cargo test -p vision-training
-```
-
-### Benchmarks
-
-```bash
-# Build with optimizations
-cargo build --release
-
-# Run benchmarks (if implemented)
+LD_LIBRARY_PATH=/root/miniconda3/lib cargo test --workspace
+cargo fmt
+cargo clippy
 cargo bench
 ```
 
-### Code Formatting
-
-```bash
-cargo fmt
-cargo clippy
-```
-
-## Integration with Servers
-
-### storage-server
-
-Add to `requirements.txt`:
-```
-vision-storage @ file:///path/to/vision-rust-core/crates/vision-storage/target/wheels/vision_storage-*.whl
-```
-
-Replace in Python code:
-```python
-# Before
-from api.utils.thumbnail import generate_thumbnail
-from api.utils.analysis.verifyEncoding import verify_encoding
-
-# After
-from vision_storage import generate_thumbnail, verify_encoding
-```
+## Integration with servers
 
 ### training-server
 
 Add to `requirements.txt`:
 ```
-vision-training @ file:///path/to/vision-rust-core/crates/vision-training/target/wheels/vision_training-*.whl
+vision-training @ file:///path/to/vision-rust-core/target/wheels/vision_training-*.whl
 ```
 
 ### vision-ai
 
-Add to `package.json`:
+Add to `package.json` (currently **not** done — the module is unused):
 ```json
 {
   "dependencies": {

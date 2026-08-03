@@ -3,28 +3,6 @@
  */
 
 /**
- * Parse JSON string using SIMD acceleration (3-5x faster than JSON.parse)
- * @param jsonString - JSON string to parse
- * @returns Parsed JavaScript value
- */
-export function jsonParse(jsonString: string): unknown;
-
-/**
- * Stringify value to JSON (faster for large objects)
- * @param value - Value to stringify
- * @param pretty - Pretty print with indentation (default: false)
- * @returns JSON string
- */
-export function jsonStringify(value: unknown, pretty?: boolean): string;
-
-/**
- * Parse JSON array with SIMD - optimized for arrays of objects
- * @param jsonString - JSON array string
- * @returns Parsed array
- */
-export function jsonParseArray<T = unknown>(jsonString: string): T[];
-
-/**
  * Create ZIP from a directory (4-6x faster than archiver)
  * @param sourceDir - Directory to compress
  * @param zipPath - Output ZIP file path

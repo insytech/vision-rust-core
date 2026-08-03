@@ -20,7 +20,6 @@ zip = { workspace = true }
 
 serde = { workspace = true }
 serde_json = { workspace = true }
-simd-json = { workspace = true }
 
 walkdir = { workspace = true }
 
